@@ -126,7 +126,6 @@ function addDepartment() {
                 'INSERT INTO department (name) VALUES (?)',
                 [answer.department], (err, results) => {
                     if (err) console.log(err);
-                    viewDepartments();
 
                 });
 
@@ -157,7 +156,7 @@ function getDepartments() {
 
 //function to add a new role to the database
 function addRole(departments) {
-    return inquirer.prompt(
+    inquirer.prompt(
         [{
             type: 'input',
             name: 'role',
@@ -332,7 +331,7 @@ function addEmployee(managers, roles) {
         {
             type: 'list',
             name: 'roleID',
-            message: 'What is the role ID for this employee?',
+            message: 'What is the role for this employee?',
             choices: roles
         },
         {
