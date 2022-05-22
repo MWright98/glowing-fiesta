@@ -2,6 +2,9 @@
 
   ## Description
   Simple command line application to manage a database of employees
+  
+  ## Walkthrough 
+  ![Walkthrough](https://user-images.githubusercontent.com/63832314/169721087-2674f052-43b3-4e67-84ca-a6e6be4ffee1.gif)
 
   ## Table of Contents
   - [Installation](#installation)
