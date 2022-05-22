@@ -17,4 +17,5 @@ VALUES
 ('James','Fraser',1,null),
 ('Jack','London',2,null),
 ('Robert','Bruce',3,1),
-('Peter','Greenway',4,null);
+('Peter','Greenway',4,null),
+('Samuel','Bruce',2,2);
