@@ -2,7 +2,9 @@ const inquirer = require("inquirer");
 const mysql = require('mysql2');
 const cTable = require('console.table');
 
-const managerArray = [];
+let managerArray = [];
+let employeeArray = [];
+let roleArray = [];
 
 //mysql database connection
 const db = mysql.createConnection(
@@ -25,7 +27,7 @@ const promptUser = () => {
             name: 'action',
             message: 'What would you like to do?',
             choices: ['View all departments', 'View all roles', 'View all employees',
-                'Add a department', 'Add a role', 'Add an employee', 'Update an employee role']
+                'Add a department', 'Add a role', 'Add an employee', 'Update an employee role', 'Exit']
         }
     ])
         .then((answer) => {
@@ -52,13 +54,16 @@ const actions = (answer) => {
             addRole();
             break;
         case "Add an employee":
-            getEmployees();
+            getManagers();
             break;
         case "Update an employee role":
-            console.log("Updating role");
+            getEmployees();
             break;
+        case "Exit":
+            process.exit();
     }
 };
+
 
 //function to display all departments
 function viewDepartments() {
@@ -66,6 +71,7 @@ function viewDepartments() {
         'SELECT * FROM department',
         function (err, results, fields) {
             console.table(results);
+            promptUser();
         }
     )
 };
@@ -73,9 +79,10 @@ function viewDepartments() {
 //function to display all roles
 function viewRoles() {
     db.query(
-        'SELECT * FROM employee_role',
+        'SELECT employee_role.*, department.name AS department FROM employee_role LEFT JOIN department ON employee_role.department_id = department.id',
         function (err, results, fields) {
             console.table(results);
+            promptUser();
         }
     )
 };
@@ -83,9 +90,14 @@ function viewRoles() {
 //function to display all employees
 function viewEmployees() {
     db.query(
-        'SELECT * FROM employee',
+        //BELOW WORKS FOR ROLES
+        // SELECT employee.id, employee.first_name, employee.last_name, employee.role_id, employee_role.title AS role,employee.manager_id FROM employee employee LEFT JOIN employee_role ON employee.role_id = employee_role.id 
+        'SELECT employee.id, employee.first_name,employee.last_name,employee.role_id,employee.manager_id,manager.first_name AS ManagerFirstName ,manager.last_name AS ManagerLastName, employee_role.title AS role FROM employee employee LEFT JOIN employee_role ON employee.role_id = employee_role.id LEFT JOIN employee manager ON manager.id = employee.manager_id;',
+        //BELOW WORKS FOR MANAGERS
+        //'SELECT employee.id, employee.first_name,employee.last_name,employee.role_id,employee.manager_id,manager.first_name AS ManagerFirstName ,manager.last_name AS ManagerLastName FROM employee employee LEFT JOIN employee_role ON employee.role_id = employee_role.id LEFT JOIN employee manager ON manager.id = employee.manager_id;,
         function (err, results, fields) {
             console.table(results);
+            promptUser();
         }
     )
 };
@@ -110,6 +122,7 @@ function addDepartment() {
                 });
 
             console.log("Department added")
+            promptUser();
         })
 }
 
@@ -143,12 +156,14 @@ function addRole() {
                 });
 
             console.log("Role added")
+            promptUser();
         })
 }
 
 //Function to put all employees into an array for use as manager options
-function getEmployees() {
+function getManagers() {
     let itemsProcessed = 0;
+    managerArray = [];
 
     db.query(
         'SELECT first_name, last_name FROM employee', (err, results) => {
@@ -163,16 +178,53 @@ function getEmployees() {
                 if (itemsProcessed === results.length) {
                     addEmployee(managerArray);
                 }
+            })
+        })
+};
+
+//Function to put all employees into an array for use in update function
+function getEmployees() {
+    let itemsProcessed = 0;
+    employeeArray = [];
+
+    db.query(
+        'SELECT first_name, last_name FROM employee', (err, results) => {
+            //console.log(results);
+            results.forEach(element => {
+
+                // var employee = ('"' + element.first_name + ' ' + element.last_name + '"' + ',')
+                var employee = (element.first_name + ' ' + element.last_name)
+                employeeArray.push(employee);
+
+                itemsProcessed++;
+                if (itemsProcessed === results.length) {
+                    getRoles(employeeArray);
+                }
+            })
+        })
+};
+
+function getRoles(employees) {
+    let itemsProcessed = 0;
+    roleArray = [];
 
 
-            }
+    db.query(
+        'SELECT title FROM employee_role', (err, results) => {
+            //console.log(results);
+            results.forEach(element => {
 
-            )
-        }
-    )
+                // var employee = ('"' + element.first_name + ' ' + element.last_name + '"' + ',')
+                var role = (element.title)
+                roleArray.push(role);
 
-
-}
+                itemsProcessed++;
+                if (itemsProcessed === results.length) {
+                    updateEmployee(employees, roleArray);
+                }
+            })
+        })
+};
 
 
 
@@ -204,20 +256,70 @@ function addEmployee(managers) {
         ]
     )
         .then((answers) => {
-            db.query(
-                'INSERT INTO employee (first_name, last_name, role_id) VALUES (?,?,?)',
-                [answers.firstName, answers.lastName, answers.roleID], (err, results) => {
-                    if (err) console.log(err);
-                    viewEmployees();
+            var managerName = answers.manager;
+            result = managerName.trim().split(/\s+/);
+            db.query('SELECT id FROM employee WHERE employee.last_name = ?',
+                [result[1]], (err, results) => {
+                    //console.log(results[0].id);
+                    db.query(
+                        'INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (?,?,?,?)',
+                        [answers.firstName, answers.lastName, answers.roleID, results[0].id], (err, results) => {
+                            if (err) console.log(err);
+                            //viewEmployees();
 
-                });
+                        });
+                }
+            )
+
 
             console.log("Employee added")
+            promptUser();
         })
 }
 
-function updateEmployee() {
+function updateEmployee(employees, roles) {
+    return inquirer.prompt(
+        [{
+            type: 'list',
+            name: 'employeeToUpdate',
+            message: 'Which employee would you like to update?',
+            choices: employees
+        },
+        {
+            type: 'list',
+            name: 'newRole',
+            message: "What is the employee's new role?",
+            choices: roles
+        }
+        ]
+    )
+        .then((answers) => {
+            var updateName = answers.employeeToUpdate;
+            result = updateName.trim().split(/\s+/);
 
+            // console.log('employee first name ' + result[0]);
+            //console.log('employee last name ' + result[1]);
+            //console.log('new role is ' + answers.newRole);
+
+            // console.log('answers.newRole ' + answers.newRole);
+            db.query('SELECT id FROM employee_role WHERE employee_role.title = ?',
+                [answers.newRole], (err, results) => {
+
+                    let newRoleID = results[0].id
+                    db.query('SELECT id FROM employee WHERE employee.last_name = ?',
+                        [result[1]], (err, results) => {
+
+                            //console.log('results[0].id, result[1] ' + results[0].id, result[1])
+                            db.query(
+                                'UPDATE employee SET role_id = ? WHERE id = ?', [newRoleID, results[0].id],
+                                (err, results) => {
+                                    console.log("Employee role updated!");
+                                    promptUser();
+                                }
+                            )
+                        })
+                });
+        });
 }
 
 promptUser();
